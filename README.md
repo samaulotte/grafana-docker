@@ -1,7 +1,14 @@
-# grafana-docker
-TVC EXAMEN
-Voici une version proche du TP officiel Grafana Mimir GitHub : 3 nœuds Mimir, MinIO, Nginx, Alloy, Grafana. L’exemple officiel Grafana utilise aussi MinIO, 3 conteneurs Mimir, un load balancer Nginx sur 9009, et une config Mimir avec -config.file.  ￼
-Pour éviter ton erreur précédente, je garde un seul bucket MinIO mimir, mais avec blocks_storage.storage_prefix: blocks, comme dans la config officielle.  ￼
+Voici une version prête à coller dans un README.md, en gardant tout le contenu.
+
+Stack Docker Compose locale : Grafana Mimir, MinIO, Nginx, Alloy et Grafana
+
+Voici une version proche du TP officiel Grafana Mimir GitHub : 3 nœuds Mimir, MinIO, Nginx, Alloy, Grafana.
+
+L’exemple officiel Grafana utilise aussi MinIO, 3 conteneurs Mimir, un load balancer Nginx sur 9009, et une config Mimir avec -config.file.
+
+Pour éviter ton erreur précédente, je garde un seul bucket MinIO mimir, mais avec blocks_storage.storage_prefix: blocks, comme dans la config officielle.
+
+⸻
 
 Arborescence
 
@@ -215,7 +222,7 @@ prometheus.remote_write "mimir" {
   }
 }
 
-La partie Alloy utilise prometheus.remote_write, composant officiel pour envoyer des métriques vers un endpoint compatible Prometheus remote write.  ￼
+La partie Alloy utilise prometheus.remote_write, composant officiel pour envoyer des métriques vers un endpoint compatible Prometheus remote write.
 
 ⸻
 
@@ -225,7 +232,9 @@ cd "/chemin/vers/ton/projet"
 docker compose up -d
 docker ps
 
-Logs utiles :
+⸻
+
+Logs utiles
 
 docker logs minio --tail 50
 docker logs mimir-1 --tail 100
@@ -235,16 +244,24 @@ docker logs nginx --tail 50
 docker logs alloy --tail 50
 docker logs grafana --tail 50
 
-Accès :
+⸻
 
-Grafana       : http://localhost:3000
-MinIO API     : http://localhost:9000
-MinIO console : http://localhost:9001
-Mimir via Nginx : http://localhost:9009
+Accès
 
-Identifiants MinIO :
+Grafana          : http://localhost:3000
+MinIO API        : http://localhost:9000
+MinIO console    : http://localhost:9001
+Mimir via Nginx  : http://localhost:9009
+
+⸻
+
+Identifiants MinIO
 
 admin / totototo
+
+⸻
+
+Debug Mimir
 
 Si Mimir plante encore, vérifie d’abord :
 
