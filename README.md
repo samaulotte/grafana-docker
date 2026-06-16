@@ -20,121 +20,75 @@ touch docker-compose.yml config/mimir.yaml config/nginx.conf config/config.alloy
 ## `docker-compose.yml`
 
 ```yaml
+Voici la réécriture propre de ce qui est visible sur les photos :
+
 services:
   minio:
-    image: minio/minio:latest
-    container_name: minio
-    restart: unless-stopped
-    entrypoint: [""]
-    command: sh -c "mkdir -p /data/mimir && minio server /data --console-address ':9001'"
+    image: minio/minio
+    command: minio server --console-address ":9001" --quiet /data
     environment:
-      MINIO_ROOT_USER: admin
-      MINIO_ROOT_PASSWORD: totototo
-    ports:
-      - "9000:9000"
-      - "9001:9001"
+      - MINIO_ROOT_USER=admin
+      - MINIO_ROOT_PASSWORD=totototo
     volumes:
       - minio-data:/data
-    networks:
-      - observability
-
-  mimir-1:
-    image: grafana/mimir:latest
-    container_name: mimir-1
-    hostname: mimir-1
-    restart: unless-stopped
-    command:
-      - "-config.file=/etc/mimir.yaml"
-    volumes:
-      - ./config/mimir.yaml:/etc/mimir.yaml:ro
-      - mimir-1-data:/data
-    networks:
-      - observability
-    depends_on:
-      - minio
-
-  mimir-2:
-    image: grafana/mimir:latest
-    container_name: mimir-2
-    hostname: mimir-2
-    restart: unless-stopped
-    command:
-      - "-config.file=/etc/mimir.yaml"
-    volumes:
-      - ./config/mimir.yaml:/etc/mimir.yaml:ro
-      - mimir-2-data:/data
-    networks:
-      - observability
-    depends_on:
-      - minio
-
-  mimir-3:
-    image: grafana/mimir:latest
-    container_name: mimir-3
-    hostname: mimir-3
-    restart: unless-stopped
-    command:
-      - "-config.file=/etc/mimir.yaml"
-    volumes:
-      - ./config/mimir.yaml:/etc/mimir.yaml:ro
-      - mimir-3-data:/data
-    networks:
-      - observability
-    depends_on:
-      - minio
-
-  nginx:
-    image: nginx:latest
-    container_name: nginx
-    restart: unless-stopped
     ports:
-      - "9009:9009"
+      - 9001:9001
+  mimir-1:
+    image: grafana/mimir
+    command: ["-config.file=/etc/mimir.yaml"]
+    hostname: mimir-1
+    depends_on:
+      - minio
+    volumes:
+      - ./config/mimir.yaml:/etc/mimir.yaml
+      - mimir-1-data:/data
+  mimir-2:
+    image: grafana/mimir
+    command: ["-config.file=/etc/mimir.yaml"]
+    hostname: mimir-2
+    depends_on:
+      - minio
+    volumes:
+      - ./config/mimir.yaml:/etc/mimir.yaml
+      - mimir-2-data:/data
+  mimir-3:
+    image: grafana/mimir
+    command: ["-config.file=/etc/mimir.yaml"]
+    hostname: mimir-3
+    depends_on:
+      - minio
+    volumes:
+      - ./config/mimir.yaml:/etc/mimir.yaml
+      - mimir-3-data:/data
+  load-balancer:
+    image: nginx:latest
     volumes:
       - ./config/nginx.conf:/etc/nginx/nginx.conf:ro
-    networks:
-      - observability
     depends_on:
       - mimir-1
       - mimir-2
       - mimir-3
-
-  alloy:
-    image: grafana/alloy:latest
-    container_name: alloy
-    restart: unless-stopped
-    command:
-      - run
-      - /etc/alloy/config.alloy
-    volumes:
-      - ./config/config.alloy:/etc/alloy/config.alloy:ro
-    networks:
-      - observability
-    depends_on:
-      - nginx
-
+    ports:
+      - 9009:9009
   grafana:
     image: grafana/grafana:latest
-    container_name: grafana
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
+    environment:
+      - GF_LOG_MODE=console
+      - GF_LOG_LEVEL=critical
     volumes:
       - grafana-data:/var/lib/grafana
-    networks:
-      - observability
     depends_on:
-      - nginx
-
+      - mimir-1
+      - mimir-2
+      - mimir-3
+    ports:
+      - 9000:3000
 volumes:
   minio-data:
   mimir-1-data:
   mimir-2-data:
   mimir-3-data:
   grafana-data:
-
-networks:
-  observability:
-    driver: bridge
 ```
 
 ---
@@ -142,18 +96,12 @@ networks:
 ## `config/mimir.yaml`
 
 ```yaml
-# Config locale de test, inspirée de l'exemple officiel Grafana Mimir.
-# Ne pas utiliser telle quelle en production.
+# Do not use this configuration in production.
+# It is for demonstration purposes only.
+# Run Mimir in single process mode, with all components running in 1 process.
+target: all,alertmanager,overrides-exporter
 
-target: all
-
-multitenancy_enabled: false
-
-server:
-  http_listen_port: 8080
-  grpc_listen_port: 9095
-  log_level: warn
-
+# Configure Mimir to use Minio as object storage backend.
 common:
   storage:
     backend: s3
@@ -164,52 +112,24 @@ common:
       insecure: true
       bucket_name: mimir
 
+# Blocks storage requires a prefix when using a common object storage bucket.
 blocks_storage:
   storage_prefix: blocks
   tsdb:
-    dir: /data/tsdb
+    dir: /data/ingester
 
-compactor:
-  data_dir: /data/compactor
-
-ingester:
-  ring:
-    replication_factor: 3
-    kvstore:
-      store: memberlist
-
-distributor:
-  ring:
-    kvstore:
-      store: memberlist
-
-store_gateway:
-  sharding_ring:
-    replication_factor: 3
-    kvstore:
-      store: memberlist
-
-ruler:
-  rule_path: /data/ruler
-  alertmanager_url: http://127.0.0.1:8080/alertmanager
-  ring:
-    heartbeat_period: 2s
-    heartbeat_timeout: 10s
-    kvstore:
-      store: memberlist
-
+# Use memberlist, a gossip-based protocol, to enable the 3 Mimir replicas to communicate
 memberlist:
-  join_members:
-    - mimir-1
-    - mimir-2
-    - mimir-3
+  join_members: [mimir-1, mimir-2, mimir-3]
 
-limits:
-  ingestion_rate: 100000
-  ingestion_burst_size: 200000
+server:
+  log_level: warn
 ```
 
 ---
+
+
+
 
 ## `config/nginx.conf`
 
