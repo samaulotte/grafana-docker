@@ -134,25 +134,30 @@ server:
 ## `config/nginx.conf`
 
 ```nginx
-events {}
+events {
+    worker_connections 1024;
+}
 
 http {
-  upstream mimir {
-    server mimir-1:8080;
-    server mimir-2:8080;
-    server mimir-3:8080;
-  }
-
-  server {
-    listen 9009;
-
-    location / {
-      proxy_pass http://mimir;
-      proxy_set_header Host $host;
-      proxy_set_header X-Real-IP $remote_addr;
-      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    upstream backend {
+        server mimir-1:8080 max_fails=1 fail_timeout=1s;
+        server mimir-2:8080 max_fails=1 fail_timeout=1s;
+        server mimir-3:8080 max_fails=1 fail_timeout=1s backup;
     }
-  }
+
+    server {
+        listen 9009;
+        access_log /dev/null;
+
+        location / {
+            proxy_pass http://backend;
+        }
+
+        location /alertmanager {
+            proxy_set_header X-Scope-OrgID demo;
+            proxy_pass http://backend;
+        }
+    }
 }
 ```
 
@@ -161,16 +166,26 @@ http {
 ## `config/config.alloy`
 
 ```river
-prometheus.exporter.self "alloy" {}
+logging {
+  level = "warn"
+}
 
-prometheus.scrape "alloy" {
-  targets    = prometheus.exporter.self.alloy.targets
-  forward_to = [prometheus.remote_write.mimir.receiver]
+prometheus.exporter.unix "node" {
+}
+
+prometheus.scrape "node_metrics" {
+  targets         = prometheus.exporter.unix.node.targets
+  scrape_interval = "15s"
+  forward_to      = [prometheus.remote_write.mimir.receiver]
 }
 
 prometheus.remote_write "mimir" {
   endpoint {
-    url = "http://nginx:9009/api/v1/push"
+    url = "http://192.168.50.80:9009/api/v1/push"
+
+    headers = {
+      "X-Scope-OrgID" = "demo",
+    }
   }
 }
 ```
